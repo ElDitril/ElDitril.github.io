@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: hsl(0,0%,7%); --panel: hsl(240,2%,12%); --card: hsl(240,1%,17%); --line: hsl(0,0%,22%);
+    --text: hsl(0,0%,92%); --muted: hsl(0,0%,62%); --accent: hsl(45,100%,72%); --danger: hsl(0,60%,62%);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: Poppins, system-ui, sans-serif; font-size: 14px; }
+  header.top {
+    position: sticky; top: 0; z-index: 10; background: hsla(240,2%,12%,.92); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line); padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  }
+  header.top h1 { font-size: 16px; font-weight: 600; margin: 0 auto 0 0; }
+  header.top h1 small { display: block; color: var(--muted); font-weight: 300; font-size: 12px; }
+  button { font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 8px 14px; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 600; }
+  button.small { padding: 3px 9px; font-size: 12px; border-radius: 8px; }
+  button.danger:hover { border-color: var(--danger); color: var(--danger); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 16px; }
+  .help { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; color: var(--muted); line-height: 1.6; margin-bottom: 16px; }
+  .help b { color: var(--text); }
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .tabs button.on { border-color: var(--accent); color: var(--accent); }
+  fieldset { border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 0 0 14px; background: var(--panel); min-width: 0; }
+  fieldset fieldset { background: var(--card); }
+  legend { color: var(--accent); font-weight: 500; padding: 0 6px; }
+  .field { margin-bottom: 12px; }
+  .field > label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pair .lang { font-size: 11px; color: var(--accent); font-weight: 600; margin-bottom: 2px; }
+  @media (max-width: 640px) { .pair { grid-template-columns: 1fr; } }
+  input, textarea, select {
+    width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 10px; resize: vertical;
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+  .item-head { display: flex; gap: 6px; align-items: center; justify-content: flex-end; margin-bottom: 8px; }
+  .item-head span { margin-right: auto; color: var(--muted); font-size: 12px; }
+  .hint { color: var(--muted); font-size: 11px; margin-top: 3px; }
+  .hint a { color: var(--accent); }
+  .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #111; padding: 10px 16px; border-radius: 10px; font-weight: 500; opacity: 0; transition: .3s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>Portfolio Editor<small>Edit your text here, then download the new content.js</small></h1>
+  <button id="btn-preview">👁 Preview</button>
+  <button id="btn-reset" class="danger">↺ Reset to current site</button>
+  <button id="btn-download" class="primary">⬇ Download content.js</button>
+</header>
+
+<div class="wrap">
+  <div class="help">
+    <b>How it works:</b> 1) Edit the fields below (each text has a French and an English box). Your changes are saved automatically in this browser.
+    2) Click <b>Preview</b> to see the site with your changes. 3) Click <b>Download content.js</b> and replace the file
+    <b>assets/js/content.js</b> in your portfolio folder with it (on GitHub: open the file → ✏️ → paste, or “Upload files”).
+    Leave a field empty to hide it.
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div id="form"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="./assets/js/content.js"></script>
+<script>
+'use strict';
+const KEY = "portfolio-draft";
+const ORIGINAL = JSON.parse(JSON.stringify(window.PORTFOLIO || {}));
+let data;
+try { data = JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { data = null; }
+if (!data) data = JSON.parse(JSON.stringify(ORIGINAL));
+
+const LABELS = {
+  profile: "Profile (sidebar)", about: "About", resume: "Resume", mobility: "Mobility", sports: "Sports & Activities",
+  name: "Name", title: "Title", photo: "Photo path", email: "Email", phones: "Phone numbers", location: "Location",
+  linkedin: "LinkedIn URL", github: "GitHub URL", cvFr: "French CV (link or file path)", cvEn: "English CV (link or file path)",
+  paragraphs: "Paragraphs", pitchVideo: "Pitch video (YouTube link or video file path)", interests: "Interest cards",
+  education: "Education", activities: "Competitions & activities", skills: "Skills", level: "Level",
+  dates: "Dates", date: "Date", text: "Text", icon: "Icon", intro: "Introduction", projects: "Mobility projects",
+  where: "Where", when: "When", roadmap: "Roadmap", checklist: "Checklist", items: "Activities"
+};
+const HINTS = {
+  icon: 'Icon name from <a href="https://ionic.io/ionicons" target="_blank">ionicons.com</a> (e.g. bicycle-outline)',
+  photo: "Put the image in assets/images/ and write ./assets/images/your-file.jpg",
+  cvFr: "Put the PDF in assets/docs/ and write ./assets/docs/CV_FR.pdf (or paste a Google Drive link)",
+  cvEn: "Put the PDF in assets/docs/ and write ./assets/docs/CV_EN.pdf (or paste a Google Drive link)",
+  pitchVideo: "e.g. https://youtu.be/XXXXXXXX (unlisted YouTube works well)"
+};
+const LEVELS = ["beginner", "intermediate", "advanced"];
+
+const isPair = (v) => v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).every(k => k === "fr" || k === "en") && ("fr" in v || "en" in v);
+const label = (k) => LABELS[k] || (typeof k === "number" ? "" : k);
+const el = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "on") for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn);
+    else if (k === "html") e.innerHTML = v; else e.setAttribute(k, v);
+  }
+  kids.flat().forEach(c => c != null && e.append(c));
+  return e;
+};
+
+let tab = Object.keys(data)[0];
+let saveTimer;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} }, 200);
+}
+function toast(msg) { const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2200); }
+
+function textBox(obj, key, placeholder = "") {
+  const v = obj[key] ?? "";
+  const long = String(v).length > 70 || ["text", "paragraphs", "intro", "checklist"].includes(String(key));
+  const box = long ? el("textarea", { rows: Math.min(8, Math.max(2, Math.ceil(String(v).length / 70))) }) : el("input", { type: "text" });
+  box.value = v; box.placeholder = placeholder;
+  box.addEventListener("input", () => { obj[key] = box.value; save(); });
+  return box;
+}
+
+function blank(v) {
+  if (typeof v === "string") return "";
+  if (Array.isArray(v)) return [];
+  if (v && typeof v === "object") { const o = {}; for (const k in v) o[k] = k === "level" ? "beginner" : (k === "icon" ? v[k] : blank(v[k])); return o; }
+  return v;
+}
+
+function renderValue(parent, key, ctxKey) {
+  const v = parent[key];
+  if (isPair(v)) {
+    return el("div", { class: "pair" },
+      el("div", {}, el("div", { class: "lang" }, "FR"), textBox(v, "fr")),
+      el("div", {}, el("div", { class: "lang" }, "EN"), textBox(v, "en")));
+  }
+  if (key === "level") {
+    const s = el("select", {}, LEVELS.map(l => { const o = el("option", { value: l }, l); if (v === l) o.selected = true; return o; }));
+    s.addEventListener("change", () => { parent[key] = s.value; save(); });
+    return s;
+  }
+  if (typeof v === "string" || typeof v === "number") return textBox(parent, key, ctxKey === "name" ? "" : "");
+  if (Array.isArray(v)) return renderArray(v, key);
+  if (v && typeof v === "object") return renderObject(v, key);
+  return el("span");
+}
+
+function renderObject(obj, name) {
+  const box = el("div");
+  for (const k of Object.keys(obj)) {
+    const v = obj[k];
+    // "name" in skills may be a plain string or a FR/EN pair — allow converting
+    const f = el("div", { class: "field" }, el("label", {}, label(k)), renderValue(obj, k, k));
+    if (HINTS[k]) f.append(el("div", { class: "hint", html: HINTS[k] }));
+    if (k === "name" && typeof v === "string" && name !== "profile") {
+      f.append(el("button", { class: "small", on: { click: () => { obj[k] = { fr: v, en: v }; save(); draw(); } } }, "Translate separately (FR / EN)"));
+    }
+    box.append(f);
+  }
+  return box;
+}
+
+function renderArray(list, key) {
+  const box = el("div");
+  list.forEach((item, i) => {
+    const head = el("div", { class: "item-head" },
+      el("span", {}, `#${i + 1}`),
+      el("button", { class: "small", title: "Move up", on: { click: () => { if (i > 0) { [list[i - 1], list[i]] = [list[i], list[i - 1]]; save(); draw(); } } } }, "↑"),
+      el("button", { class: "small", title: "Move down", on: { click: () => { if (i < list.length - 1) { [list[i + 1], list[i]] = [list[i], list[i + 1]]; save(); draw(); } } } }, "↓"),
+      el("button", { class: "small danger", title: "Delete", on: { click: () => { if (confirm("Delete this item?")) { list.splice(i, 1); save(); draw(); } } } }, "✕ Delete"));
+    const fs = el("fieldset", {}, head, renderValue(list, i, key));
+    box.append(fs);
+  });
+  const template = list.length ? blank(list[list.length - 1]) : (key === "phones" ? "" : { fr: "", en: "" });
+  box.append(el("button", { on: { click: () => { list.push(JSON.parse(JSON.stringify(template))); save(); draw(); } } }, "+ Add"));
+  return box;
+}
+
+function draw() {
+  const tabs = document.getElementById("tabs");
+  tabs.innerHTML = "";
+  Object.keys(data).forEach(k => tabs.append(el("button", { class: k === tab ? "on" : "", on: { click: () => { tab = k; draw(); } } }, label(k))));
+  const form = document.getElementById("form");
+  const y = window.scrollY;
+  form.innerHTML = "";
+  form.append(el("fieldset", {}, el("legend", {}, label(tab)), renderObject(data[tab], tab)));
+  window.scrollTo(0, y);
+}
+
+function fileText() {
+  return `/* =====================================================================
+   CONTENU DU PORTFOLIO  —  PORTFOLIO CONTENT
+   Generated by editor.html on ${new Date().toISOString().slice(0, 10)}.
+   Edit it with editor.html, or by hand: each bilingual text is { "fr": "…", "en": "…" }.
+   ===================================================================== */
+
+window.PORTFOLIO = ${JSON.stringify(data, null, 2)};
+`;
+}
+
+document.getElementById("btn-download").addEventListener("click", () => {
+  const blob = new Blob([fileText()], { type: "text/javascript" });
+  const a = el("a", { href: URL.createObjectURL(blob), download: "content.js" });
+  document.body.append(a); a.click(); a.remove();
+  toast("Downloaded — replace assets/js/content.js with it");
+});
+document.getElementById("btn-preview").addEventListener("click", () => {
+  try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {}
+  window.open("index.html?preview", "_blank");
+});
+document.getElementById("btn-reset").addEventListener("click", () => {
+  if (!confirm("Discard your unsaved edits and reload the text currently in content.js?")) return;
+  data = JSON.parse(JSON.stringify(ORIGINAL));
+  try { localStorage.removeItem(KEY); } catch (e) {}
+  draw(); toast("Reset done");
+});
+
+draw();
+</script>
+</body>
+</html>
